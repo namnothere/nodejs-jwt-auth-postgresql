@@ -16,29 +16,29 @@ exports.signup = (req, res) => {
 		email: req.body.email,
 		password: bcrypt.hashSync(req.body.password, 8)
 	})
-		.then(user => {
-			if (req.body.roles) {
-				Role.findAll({
-					where: {
-						name: {
-							[Op.or]: req.body.roles
-						}
+	.then(user => {
+		if (req.body.roles) {
+			Role.findAll({
+				where: {
+					name: {
+						[Op.or]: req.body.roles
 					}
-				}).then(roles => {
-					user.setRoles(roles).then(() => {
-						res.send({ message: "User was registered successfully!" });
-					});
-				});
-			} else {
-				// user role = 1
-				user.setRoles([1]).then(() => {
+				}
+			}).then(roles => {
+				user.setRoles(roles).then(() => {
 					res.send({ message: "User was registered successfully!" });
 				});
-			}
-		})
-		.catch(err => {
-			res.status(500).send({ message: err.message });
-		});
+			});
+		} else {
+			// user role = 1
+			user.setRoles([1]).then(() => {
+				res.send({ message: "User was registered successfully!" });
+			});
+		}
+	})
+	.catch(err => {
+		res.status(500).send({ message: err.message });
+	});
 };
 
 exports.signin = (req, res) => {
@@ -47,47 +47,50 @@ exports.signin = (req, res) => {
 			username: req.body.username
 		}
 	})
-		.then(async (user) => {
-			if (!user) {
-				return res.status(404).send({ message: "User Not found." });
-			}
+	.then(async (user) => {
+		if (!user) {
+			return res.status(404).send({ message: "User Not found." });
+		}
 
-			var passwordIsValid = bcrypt.compareSync(
-				req.body.password,
-				user.password
-			);
+		var passwordIsValid = bcrypt.compareSync(
+			req.body.password,
+			user.password
+		);
 
-			if (!passwordIsValid) {
-				return res.status(401).send({
-					accessToken: null,
-					message: "Invalid Password!"
-				});
-			}
-
-			var token = jwt.sign({ id: user.id }, config.secret, {
-				expiresIn: config.jwtExpiration
+		if (!passwordIsValid) {
+			return res.status(401).send({
+				accessToken: null,
+				message: "Invalid Password!"
 			});
+		}
 
-			let refreshToken = await RefreshToken.createToken(user);
-
-			var authorities = [];
-			user.getRoles().then(roles => {
-				for (let i = 0; i < roles.length; i++) {
-					authorities.push("ROLE_" + roles[i].name.toUpperCase());
-				}
-				res.status(200).send({
-					id: user.id,
-					username: user.username,
-					email: user.email,
-					roles: authorities,
-					accessToken: token,
-					refreshToken: refreshToken
-				});
-			});
-		})
-		.catch(err => {
-			res.status(500).send({ message: err.message });
+		var token = jwt.sign({ id: user.id }, config.secret, {
+			expiresIn: config.jwtExpiration
 		});
+
+		let refreshToken = await RefreshToken.createToken(user);
+
+		var authorities = [];
+		user.getRoles().then(roles => {
+			for (let i = 0; i < roles.length; i++) {
+				authorities.push("ROLE_" + roles[i].name.toUpperCase());
+			}
+
+			// req.session.token = token;
+
+			res.status(200).send({
+				// id: user.id,
+				// username: user.username,
+				// email: user.email,
+				roles: authorities,
+				accessToken: token,
+				refreshToken: refreshToken
+			});
+		});
+	})
+	.catch(err => {
+		res.status(500).send({ message: err.message });
+	});
 };
 
 exports.refreshToken = async (req, res) => {
@@ -121,9 +124,11 @@ exports.refreshToken = async (req, res) => {
 		let newAccessToken = jwt.sign({ id: user.id }, config.secret, {
 			expiresIn: config.jwtExpiration
 		})
+		// req.session.token = newAccessToken;
 		return res.status(200).send({
-			accessToken: newAccessToken,
-			refreshToken: refreshToken.token
+			msg: "The token has been refreshed",
+			refreshToken: refreshToken.token,
+			accessToken: newAccessToken
 		});
 
 	} catch (err) {
@@ -131,3 +136,16 @@ exports.refreshToken = async (req, res) => {
 	}
 
 }
+
+exports.signout = async (req, res) => {
+	try {
+		req.session = null;
+		RefreshToken.revokeToken(req.body.refreshToken);
+		return res.status(200).send({
+			message: "You've been signed out!"
+		});
+	} catch (err) {
+		this.next(err);
+	}
+};
+  

@@ -1,6 +1,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
+const cookieSession = require("cookie-session");
 const app = express();
 
 var corsOptions = {
@@ -14,6 +15,15 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
     extended: true
 }))
+
+app.use(
+    cookieSession({
+        name: "session",
+        keys: ["COOKIE_SECRET"],
+        httpOnly: true,
+    })
+);
+  
 
 const db = require("./app/models");
 const Role = db.role;

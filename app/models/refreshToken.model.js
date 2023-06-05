@@ -31,5 +31,20 @@ module.exports = (sequelize, Sequelize) => {
         return token.expiryDate.getTime() < new Date().getTime();
     };
 
+    RefreshToken.revokeToken = async function (token) {
+
+        if (!token) {
+            return true;
+        }
+
+        await this.destroy({
+            where: {
+                token: token,
+            },
+        }).then(() => {
+            return true;
+        })
+    }
+
     return RefreshToken;
 };
